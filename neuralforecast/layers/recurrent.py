@@ -29,16 +29,17 @@ class InputSpec(object):
 
 
 class ARMA(SimpleRNN):
-    ''' Recurrent neural network layer derived from a fully-connected RNN, replicating the structure
+    '''
+    Recurrent neural network layer derived from a fully-connected RNN, replicating the structure
     of an ARMA model used for time-series prediction.
 
     Parameters:
         inner_input_dim: Input dimension of recurrent/context units, may differ from output dim
     '''
-    def __init__(self, q, **kwargs):
+    def __init__(self, q, ma_only=False, **kwargs):
         self.inner_input_dim = q
+        self.ma_only = ma_only
         super(ARMA, self).__init__(**kwargs)
-        # self.output_dim = 1  # TODO: fix this
 
     def get_initial_states(self, x):
         # build an all-zero tensor of shape (samples, inner_input_dim)
@@ -94,17 +95,25 @@ class ARMA(SimpleRNN):
 
         # Make last hidden input the residual of the prediction and
         # the last available feature.
-        update = K.expand_dims(hidden_input[:, -1] - x[:, -1])
-        hidden_input = K.concatenate((hidden_input[:, :-1], update))
-        h = K.dot(x * B_W, self.W) + self.b
+        if self.inner_input_dim > 0:
+            update = K.expand_dims(hidden_input[:, -1] - x[:, -1])
+            hidden_input = K.concatenate((hidden_input[:, :-1], update))
 
-        output = self.activation(h + K.dot(hidden_input * B_U, self.U))
+        if self.ma_only:
+            h = self.b
+        else:
+            h = K.dot(x * B_W, self.W) + self.b
 
-        new_state = K.concatenate((hidden_input[:, 1:], output))
+        if self.inner_input_dim > 0:
+            output = self.activation(h + K.dot(hidden_input * B_U, self.U))
+            new_state = K.concatenate((hidden_input[:, 1:], output))
+            return output, [new_state]
 
-        return output, [new_state]
+        else:
+            output = self.activation(h)
+            return output, [output]
 
     def get_config(self):
         config = {"inner_input_dim": self.inner_input_dim}
-        base_config = super(RecurrentArmaNetwork, self).get_config()
+        base_config = super(ARMA, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))

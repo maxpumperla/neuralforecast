@@ -47,12 +47,12 @@ class ForecastModel(object):
     def plot_predictions(self, out_file):
         n = len(self.X_test)
 
-        original = self.y_test[-n:]
+        original = self.y_test
         prediction = self.model.predict(self.X_test)
 
         fig = plt.figure()
-        plt.plot(range(n), original)
-        plt.plot(range(n), prediction)
+        plt.plot(range(n-1), original[:-1])
+        plt.plot(range(n-1), prediction[1:])
         fig.savefig(out_file)
 
 
@@ -97,6 +97,30 @@ class NeuralAR(ForecastModel):
             ts = ts.reshape(1, len(ts))
 
         X, y = sliding_window(ts, p=self.p, drop_last_dim=True)
+        (X_train, y_train), (X_test, y_test) = train_test_split(X, y, train_percentage=train_percentage)
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_test = X_test
+        self.y_test = y_test
+        self.has_data = True
+
+
+class NeuralMA(ForecastModel):
+
+    def __init__(self, q, loss='mean_squared_error', optimizer='sgd'):
+        self.q = q
+        super(NeuralMA, self).__init__()
+
+        model = Sequential()
+        model.add(ARMA(q=self.q, input_shape=(1, 1), output_dim=1, activation='linear'))
+        model.compile(loss=loss, optimizer=optimizer)
+        self.model = model
+
+    def preprocess(self, ts, train_percentage):
+        if len(ts.shape) == 1:
+            ts = ts.reshape(1, len(ts))
+
+        X, y = sliding_window(ts, p=1, drop_last_dim=False)
         (X_train, y_train), (X_test, y_test) = train_test_split(X, y, train_percentage=train_percentage)
         self.X_train = X_train
         self.y_train = y_train

@@ -3,7 +3,7 @@ from __future__ import print_function
 import numpy as np
 
 
-def sliding_window(X, p=10):
+def sliding_window(X, p=10, drop_last_dim=False):
     nb_samples = X.shape[0]
     time_steps = X.shape[1]
     ts = time_steps - p
@@ -25,4 +25,6 @@ def sliding_window(X, p=10):
             X_out[i*ts + step] = X[i, step:step+p, :]
             y_out[i*ts + step] = X[i, step+p, :]
 
+    if drop_last_dim:
+        X_out = np.squeeze(X_out)
     return X_out, y_out

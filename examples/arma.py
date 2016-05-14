@@ -19,4 +19,4 @@ narma.fit(sample, batch_size=32, nb_epoch=50)
 score = narma.evaluate()
 print(score)
 
-narma.plot_predictions('temp.png')
+narma.plot_predictions('fit_arma.png')

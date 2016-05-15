@@ -4,6 +4,16 @@ import numpy as np
 
 
 def sliding_window(X, p=10, drop_last_dim=False):
+    '''
+    Generate sliding windows of features of shape (len(X)-p, p, 1) from a
+    one-dimensional time-series, drop last dimension optionally. Provide labels
+    by looking ahead one time step.
+
+    Example:
+    X = [1, 2, 3, 4, 5, 6] and p = 3 will be transformed into
+    X_out = [[1, 2, 3], [2, 3, 4], [3, 4, 5]] and
+    y_out = [4, 5, 6]
+    '''
     nb_samples = X.shape[0]
     time_steps = X.shape[1]
     ts = time_steps - p

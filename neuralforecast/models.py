@@ -11,11 +11,11 @@ import matplotlib.pyplot as plt
 
 
 class ForecastModel(object):
+    '''
+    Abstract base class for all neuralforecast models to come.
+    Subclasses have to provide a keras model as self.model
+    '''
     def __init__(self):
-        '''
-        Base class for all neuralforecast models.
-        Subclasses have to provide a keras model as self.model
-        '''
         self.has_data = False
 
     def get_data(self):

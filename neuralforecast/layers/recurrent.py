@@ -5,36 +5,18 @@ from keras import backend as K
 from keras.layers.recurrent import SimpleRNN
 
 
-class InputSpec(object):
-    '''
-    Note: This has been copied from Keras' engine module, which is not importable.
-
-    This specifies the ndim, dtype and shape of every input to a layer.
-    Every layer should expose (if appropriate) an `input_spec` attribute:
-    a list of instances of InputSpec (one per input tensor).
-    A None entry in a shape is compatible with any dimension,
-    a None shape is compatible with any shape.
-    '''
-    def __init__(self, dtype=None, shape=None, ndim=None):
-        if type(ndim) is str:
-            assert '+' in ndim, 'When passing a str "ndim", it should have the form "2+", "3+", etc.'
-            int_ndim = ndim[:ndim.find('+')]
-            assert int_ndim.isdigit(), 'When passing a str "ndim", it should have the form "2+", "3+", etc.'
-        if shape is not None:
-            self.ndim = len(shape)
-        else:
-            self.ndim = ndim
-        self.dtype = dtype
-        self.shape = shape
-
-
 class ARMA(SimpleRNN):
     '''
     Recurrent neural network layer derived from a fully-connected RNN, replicating the structure
     of an ARMA model used for time-series prediction.
+    Time-series of input shape (batch_size, time, input_dim) feed into this layer and produce an
+    output of shape (batch_size, output_dim). output_dim has to be one for this layer to work.
+    Internally, a state vector of length q is maintained, which represents a length q memory cell
+    of hidden values. The output (length one) of this layer at time t-1 will be appended to the
+    state vector for time t and the previously last state will be dropped.
 
     Parameters:
-        inner_input_dim: Input dimension of recurrent/context units, may differ from output dim
+        q: Input dimension of recurrent/context units, may differ from output dim
     '''
     def __init__(self, q, ma_only=False, **kwargs):
         self.inner_input_dim = q
@@ -117,3 +99,26 @@ class ARMA(SimpleRNN):
         config = {"inner_input_dim": self.inner_input_dim}
         base_config = super(ARMA, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+
+class InputSpec(object):
+    '''
+    Note: This has been copied from Keras' engine module, which is not importable.
+
+    This specifies the ndim, dtype and shape of every input to a layer.
+    Every layer should expose (if appropriate) an `input_spec` attribute:
+    a list of instances of InputSpec (one per input tensor).
+    A None entry in a shape is compatible with any dimension,
+    a None shape is compatible with any shape.
+    '''
+    def __init__(self, dtype=None, shape=None, ndim=None):
+        if type(ndim) is str:
+            assert '+' in ndim, 'When passing a str "ndim", it should have the form "2+", "3+", etc.'
+            int_ndim = ndim[:ndim.find('+')]
+            assert int_ndim.isdigit(), 'When passing a str "ndim", it should have the form "2+", "3+", etc.'
+        if shape is not None:
+            self.ndim = len(shape)
+        else:
+            self.ndim = ndim
+        self.dtype = dtype
+        self.shape = shape

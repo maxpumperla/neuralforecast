@@ -1,0 +1,13 @@
+# Site settings
+title: Time Series Prediction
+tag_text: Time Series Prediction
+description: A Non Linear Approach with Neural Networks
+url: "http://maxpumperla.github.io/neuralforecast/"
+baseurl: ""
+
+font-awesome-include: true # make this false if you don't need font-awesome
+
+# Build settings
+markdown: kramdown
+
+exclude: ["README.md"]

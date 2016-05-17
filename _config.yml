@@ -1,8 +1,7 @@
 # Site settings
 title: Time Series Prediction
-tag_text: Time Series Prediction
+tag_text: Prediction
 description: A Non Linear Approach with Neural Networks
-font-awesome-include: true # make this false if you don't need font-awesome
 
 # Build settings
 markdown: kramdown

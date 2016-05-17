@@ -1,6 +1,0 @@
-{
-  "name": "Neuralforecast",
-  "tagline": "Time Series Prediction: A Non Linear Approach with Neural Networks",
-  "body": "# NeuralForecast\r\n\r\nThe purpose of this library is using neural networks to replicate classical\r\nforecast models from the financial industry structurally, like ```AR(p)```, ```MA(q)```, ```ARMA(p, q)```, ```ARCH(q)```\r\nor ```GARCH(p, q)```. Currently only supports ```ARMA(p, q)```.\r\n\r\n## Getting started\r\nInstall the library and run the ARMA example.\r\n```{python}\r\npip install neuralforecast\r\ngit clone https://github.com/maxpumperla/neuralforecast\r\ncd neuralforecast\r\npython examples/arma.py\r\n```\r\n",
-  "note": "Don't delete this file! It's used internally to help with page regeneration."
-}

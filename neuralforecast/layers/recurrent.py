@@ -153,6 +153,7 @@ class GARCH(SimpleRecurrentContextUnit):
 
     '''
     def __init__(self, arch_only=False, **kwargs):
+        self.arch_only = False
         super(GARCH, self).__init__(**kwargs)
 
     def step(self, x, states):
@@ -162,7 +163,7 @@ class GARCH(SimpleRecurrentContextUnit):
 
         hidden_epsilon = K.dot(x * B_W, self.W) + self.b
 
-        if self.inner_input_dim > 0:  # GARCH(p,q) case
+        if not self.arch_only:  # GARCH(p,q) case
             sigma_t_squared = self.activation(hidden_epsilon + K.dot(hidden_input * B_U, self.U))
             hidden_sigmas = K.concatenate((hidden_input[:, 1:], sigma_t_squared))
             return sigma_t_squared, [hidden_sigmas]
@@ -171,7 +172,7 @@ class GARCH(SimpleRecurrentContextUnit):
             return sigma_t_squared, [sigma_t_squared]
 
     def get_config(self):
-        config = {"ma_only": self.ma_only}
+        config = {"arch_only": self.arch_only}
         base_config = super(GARCH, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 

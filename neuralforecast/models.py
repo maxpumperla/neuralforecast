@@ -113,7 +113,8 @@ class NeuralMA(ForecastModel):
         super(NeuralMA, self).__init__()
 
         model = Sequential()
-        model.add(ARMA(inner_input_dim=self.q, input_shape=(1, 1), output_dim=1, activation='linear'))
+        model.add(ARMA(inner_input_dim=self.q, input_shape=(1, 1), output_dim=1,
+                       activation='linear', ma_only=False))
         model.compile(loss=loss, optimizer=optimizer)
         self.model = model
 
@@ -151,12 +152,17 @@ class NeuralGARCH(ForecastModel):
         if len(ts.shape) == 1:
             ts = ts.reshape(1, len(ts))
 
-        X_orig, y_orig = sliding_window(ts, p=self.q, drop_last_dim=False)
+        X_orig, y_orig = sliding_window(ts, p=self.q, drop_last_dim=True)
+        self.regressor_model.preprocess(ts, 1.0)
         self.regressor_model.fit(X_orig, y_orig)
-        residual_ts = self.regressor_model.predict(X_orig) - X_orig  # TODO: Check shapes
 
-        X_residual, y_residual = sliding_window(residual_ts, p=self.q, drop_last_dim=False)
-        y_sigmas = np.concatenate(np.zeros((self.q,)), X_residual.std(axis=1))
+        pred = self.regressor_model.model.predict(X_orig)
+        pred = pred.reshape(1, len(pred))
+        residual_ts = np.concatenate((np.zeros((1, self.q)), pred), axis=1) - ts
+
+        squared_residuals = residual_ts * residual_ts
+        X_residual, y_residual = sliding_window(squared_residuals, p=self.q, drop_last_dim=False)
+        y_sigmas = X_residual.std(axis=1)
 
         (X_train, y_train), (X_test, y_test) = train_test_split(X_residual, y_sigmas, train_percentage=train_percentage)
         self.X_train = X_train
@@ -164,3 +170,9 @@ class NeuralGARCH(ForecastModel):
         self.X_test = X_test
         self.y_test = y_test
         self.has_data = True
+
+
+class NeuralARCH(NeuralGARCH):
+    ''' ARCH(q) is GARCH(0, q) '''
+    def __init__(self, q, loss='mean_squared_error', optimizer='sgd'):
+        super(NeuralARCH, self).__init__(p=1, q=q, loss=loss, optimizer=optimizer)

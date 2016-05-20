@@ -4,10 +4,11 @@ from keras.models import Sequential
 from keras.layers.core import Dense
 
 from neuralforecast.data_generator import train_test_split
-from neuralforecast.layers.recurrent import ARMA
+from neuralforecast.layers.recurrent import ARMA, GARCH
 from neuralforecast.preprocessing.reshape import sliding_window
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class ForecastModel(object):
@@ -64,7 +65,7 @@ class NeuralARMA(ForecastModel):
         super(NeuralARMA, self).__init__()
 
         model = Sequential()
-        model.add(ARMA(q=self.q, input_shape=(self.p, 1), output_dim=1, activation='linear'))
+        model.add(ARMA(inner_input_dim=self.q, input_shape=(self.p, 1), output_dim=1, activation='linear'))
         model.compile(loss=loss, optimizer=optimizer)
         self.model = model
 
@@ -112,7 +113,7 @@ class NeuralMA(ForecastModel):
         super(NeuralMA, self).__init__()
 
         model = Sequential()
-        model.add(ARMA(q=self.q, input_shape=(1, 1), output_dim=1, activation='linear'))
+        model.add(ARMA(inner_input_dim=self.q, input_shape=(1, 1), output_dim=1, activation='linear'))
         model.compile(loss=loss, optimizer=optimizer)
         self.model = model
 
@@ -122,6 +123,42 @@ class NeuralMA(ForecastModel):
 
         X, y = sliding_window(ts, p=1, drop_last_dim=False)
         (X_train, y_train), (X_test, y_test) = train_test_split(X, y, train_percentage=train_percentage)
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_test = X_test
+        self.y_test = y_test
+        self.has_data = True
+
+
+class NeuralGARCH(ForecastModel):
+
+    def __init__(self, p, q, loss='mean_squared_error', optimizer='sgd'):
+        if q <= 0:
+            raise ValueError('q must be strictly positive')
+        self.p = p
+        self.q = q
+        super(NeuralGARCH, self).__init__()
+
+        # We regress the original time-series to the best-fitting AR(q) model to extract error terms
+        self.regressor_model = NeuralAR(p=self.q)
+
+        model = Sequential()
+        model.add(GARCH(inner_input_dim=self.p, input_shape=(self.q, 1), output_dim=1, activation='linear'))
+        model.compile(loss=loss, optimizer=optimizer)
+        self.model = model
+
+    def preprocess(self, ts, train_percentage):
+        if len(ts.shape) == 1:
+            ts = ts.reshape(1, len(ts))
+
+        X_orig, y_orig = sliding_window(ts, p=self.q, drop_last_dim=False)
+        self.regressor_model.fit(X_orig, y_orig)
+        residual_ts = self.regressor_model.predict(X_orig) - X_orig  # TODO: Check shapes
+
+        X_residual, y_residual = sliding_window(residual_ts, p=self.q, drop_last_dim=False)
+        y_sigmas = np.concatenate(np.zeros((self.q,)), X_residual.std(axis=1))
+
+        (X_train, y_train), (X_test, y_test) = train_test_split(X_residual, y_sigmas, train_percentage=train_percentage)
         self.X_train = X_train
         self.y_train = y_train
         self.X_test = X_test

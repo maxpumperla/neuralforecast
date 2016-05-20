@@ -1,4 +1,5 @@
 from __future__ import print_function
+# TODO: Generate GARCH sample
 
 import numpy as np
 import statsmodels.api as sm

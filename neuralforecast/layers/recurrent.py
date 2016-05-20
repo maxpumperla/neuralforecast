@@ -5,23 +5,17 @@ from keras import backend as K
 from keras.layers.recurrent import SimpleRNN
 
 
-class ARMA(SimpleRNN):
+class SimpleRecurrentContextUnit(SimpleRNN):
     '''
-    Recurrent neural network layer derived from a fully-connected RNN, replicating the structure
-    of an ARMA model used for time-series prediction.
-    Time-series of input shape (batch_size, time, input_dim) feed into this layer and produce an
-    output of shape (batch_size, output_dim). output_dim has to be one for this layer to work.
-    Internally, a state vector of length q is maintained, which represents a length q memory cell
-    of hidden values. The output (length one) of this layer at time t-1 will be appended to the
-    state vector for time t and the previously last state will be dropped.
+    Recurrent neural network layer with a context unit that may differ from the output
+    of the layer.
 
     Parameters:
-        q: Input dimension of recurrent/context units, may differ from output dim
+        inner_input_dim: Input dimension of recurrent/context unit, may differ from output dim
     '''
-    def __init__(self, q, ma_only=False, **kwargs):
-        self.inner_input_dim = q
-        self.ma_only = ma_only
-        super(ARMA, self).__init__(**kwargs)
+    def __init__(self, inner_input_dim, **kwargs):
+        self.inner_input_dim = inner_input_dim
+        super(SimpleRecurrentContextUnit, self).__init__(**kwargs)
 
     def get_initial_states(self, x):
         # build an all-zero tensor of shape (samples, inner_input_dim)
@@ -90,14 +84,95 @@ class ARMA(SimpleRNN):
             output = self.activation(h + K.dot(hidden_input * B_U, self.U))
             new_state = K.concatenate((hidden_input[:, 1:], output))
             return output, [new_state]
-
         else:
             output = self.activation(h)
             return output, [output]
 
     def get_config(self):
         config = {"inner_input_dim": self.inner_input_dim}
+        base_config = super(SimpleRecurrentContextUnit, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class ARMA(SimpleRecurrentContextUnit):
+    '''
+    Recurrent neural network layer derived from a fully-connected RNN, replicating the structure
+    of an ARMA model used for time-series prediction.
+    Time-series of input shape (batch_size, time, input_dim) feed into this layer and produce an
+    output of shape (batch_size, output_dim). output_dim has to be one for this layer to work.
+    Internally, a state vector of length q is maintained, which represents a length q memory cell
+    of hidden values. The output (length one) of this layer at time t-1 will be appended to the
+    state vector for time t and the previously last state will be dropped.
+
+    Parameters:
+        ma_only: Boolean flag to indicate if we're using moving average only, i.e. p == 0.
+    '''
+    def __init__(self, ma_only=False, **kwargs):
+        self.ma_only = ma_only
+        super(ARMA, self).__init__(**kwargs)
+
+    def step(self, x, states):
+        hidden_input = states[0]
+        B_U = states[1]  # Dropout mask for U
+        B_W = states[2]  # Dropout mask for W
+
+        # Make last hidden input the residual of the prediction and
+        # the last available feature.
+        if self.inner_input_dim > 0:
+            update = K.expand_dims(hidden_input[:, -1] - x[:, -1])
+            hidden_input = K.concatenate((hidden_input[:, :-1], update))
+
+        if self.ma_only:
+            h = self.b
+        else:
+            h = K.dot(x * B_W, self.W) + self.b
+
+        if self.inner_input_dim > 0:
+            output = self.activation(h + K.dot(hidden_input * B_U, self.U))
+            new_state = K.concatenate((hidden_input[:, 1:], output))
+            return output, [new_state]
+        else:
+            output = self.activation(h)
+            return output, [output]
+
+    def get_config(self):
+        config = {"ma_only": self.ma_only}
         base_config = super(ARMA, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class GARCH(SimpleRecurrentContextUnit):
+    '''
+    Recurrent neural network layer derived from a fully-connected RNN, replicating the structure
+    of a GARCH(p,q) model used for volatility prediction.
+    Time-series of input shape (batch_size, time, input_dim) feed into this layer and produce an
+    output of shape (batch_size, output_dim). output_dim has to be one for this layer to work.
+    Internally, a state vector of length q is maintained, which represents a length q memory cell
+    of previous volatilities. The output (length one) of this layer at time t-1 will be appended to the
+    state vector for time t and the previously last state will be dropped.
+
+    '''
+    def __init__(self, arch_only=False, **kwargs):
+        super(GARCH, self).__init__(**kwargs)
+
+    def step(self, x, states):
+        hidden_input = states[0]
+        B_U = states[1]  # Dropout mask for U
+        B_W = states[2]  # Dropout mask for W
+
+        hidden_epsilon = K.dot(x * B_W, self.W) + self.b
+
+        if self.inner_input_dim > 0:  # GARCH(p,q) case
+            sigma_t_squared = self.activation(hidden_epsilon + K.dot(hidden_input * B_U, self.U))
+            hidden_sigmas = K.concatenate((hidden_input[:, 1:], sigma_t_squared))
+            return sigma_t_squared, [hidden_sigmas]
+        else:  # ARCH(q) case
+            sigma_t_squared = self.activation(hidden_epsilon)
+            return sigma_t_squared, [sigma_t_squared]
+
+    def get_config(self):
+        config = {"ma_only": self.ma_only}
+        base_config = super(GARCH, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
 
